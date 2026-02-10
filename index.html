@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小鼠大厨的冰箱 | Chef Mimi's Lab v2.5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&family=Special+Elite&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --pixel-border: #3D3D3D;
+            --bg-color: #F7F7F2;
+            --mint: #A3C9A8;
+            --peach: #FABEBE;
+            --yellow: #FDE2A4;
+            --mimi-blue: #7FB3D5;
+            /* 已更新为浅蓝色 */
+        }
+
+        body {
+            font-family: 'Special Elite', 'Noto Sans SC', sans-serif;
+            background-color: var(--bg-color);
+            color: #3D3D3D;
+            letter-spacing: 0.02em;
+        }
+
+        .pixel-border {
+            border: 3px solid var(--pixel-border);
+            box-shadow: 4px 4px 0px 0px rgba(61, 61, 61, 0.15);
+            position: relative;
+            background: white;
+        }
+
+        .pixel-button {
+            border: 3px solid var(--pixel-border);
+            box-shadow: 3px 3px 0px 0px var(--pixel-border);
+            transition: all 0.1s;
+            position: relative;
+            top: 0;
+            left: 0;
+        }
+
+        .pixel-button:active {
+            top: 2px;
+            left: 2px;
+            box-shadow: 1px 1px 0px 0px var(--pixel-border);
+        }
+
+        /* 料理鼠王米米 IP */
+        .mimi-mascot {
+            width: 56px;
+            height: 50px;
+            background: var(--mimi-blue);
+            position: relative;
+            border: 3px solid var(--pixel-border);
+            margin-top: 20px;
+        }
+
+        .mimi-hat {
+            position: absolute;
+            width: 32px;
+            height: 20px;
+            background: white;
+            border: 3px solid var(--pixel-border);
+            top: -22px;
+            left: 9px;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .mimi-hat::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 8px;
+            background: white;
+            border: 3px solid var(--pixel-border);
+            bottom: -3px;
+            left: -7px;
+        }
+
+        .mimi-ear-l,
+        .mimi-ear-r {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: #E98074;
+            border: 3px solid var(--pixel-border);
+            top: -8px;
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        .mimi-ear-l {
+            left: -8px;
+        }
+
+        .mimi-ear-r {
+            right: -8px;
+        }
+
+        .mimi-eye-l,
+        .mimi-eye-r {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: white;
+            top: 12px;
+        }
+
+        .mimi-eye-l {
+            left: 10px;
+        }
+
+        .mimi-eye-r {
+            right: 10px;
+        }
+
+        .mimi-eye-l::after,
+        .mimi-eye-r::after {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: black;
+            top: 1px;
+            left: 1px;
+        }
+
+        .mimi-nose {
+            position: absolute;
+            width: 8px;
+            height: 6px;
+            background: #000;
+            bottom: 10px;
+            left: 21px;
+            border-radius: 4px;
+        }
+
+        .pixel-bubble {
+            background: white;
+            border: 3px solid var(--pixel-border);
+            padding: 12px 20px;
+            position: relative;
+        }
+
+        .pixel-bubble::after {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 18px;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-left: 3px solid var(--pixel-border);
+            border-bottom: 3px solid var(--pixel-border);
+            transform: rotate(45deg);
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 280px;
+            height: 200px;
+            margin: 0 auto;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 12px;
+            background: #EEE;
+            border: 2px solid var(--pixel-border);
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 10px;
+            background: var(--pixel-border);
+            margin-top: -6px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 3px solid var(--pixel-border);
+            margin-bottom: 2rem;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: 3px solid transparent;
+            margin-bottom: -3px;
+        }
+
+        .tab-btn.active {
+            border: 3px solid var(--pixel-border);
+            border-bottom-color: white;
+            background: white;
+        }
+
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .loading-pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-10">
+
+    <div class="max-w-6xl mx-auto space-y-10">
+
+        <!-- HEADER -->
+        <header class="flex flex-col md:flex-row items-center gap-6">
+            <div class="mimi-mascot flex-shrink-0 animate-bounce">
+                <div class="mimi-hat"></div>
+                <div class="mimi-ear-l"></div>
+                <div class="mimi-ear-r"></div>
+                <div class="mimi-eye-l"></div>
+                <div class="mimi-eye-r"></div>
+                <div class="mimi-nose"></div>
+            </div>
+            <div class="pixel-bubble flex-grow">
+                <h1 class="text-xl font-bold tracking-widest uppercase">Chef Mimi's Kitchen.</h1>
+                <p id="mimi-speech" class="text-sm mt-1 opacity-80 italic">你好！我是大厨米米。我会帮你管好冰箱，顺便找找好吃的做法！</p>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+                <button onclick="openModal('scan-modal')" class="pixel-button bg-yellow px-4 py-3 font-bold text-xs">
+                    <i class="fas fa-camera mr-2"></i>智能录入
+                </button>
+                <button onclick="openModal('add-modal')" class="pixel-button bg-mint px-4 py-3 font-bold text-xs">
+                    <i class="fas fa-plus mr-2"></i>常规入库
+                </button>
+                <button onclick="openModal('settings-modal')"
+                    class="pixel-button bg-mimi-blue px-4 py-3 font-bold text-xs"
+                    style="background-color: var(--mimi-blue);">
+                    <i class="fas fa-cog mr-2"></i>设置
+                </button>
+                <button onclick="exportData()" class="pixel-button bg-stone-100 px-3 py-3 font-bold text-xs"
+                    title="导出数据备份">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button onclick="document.getElementById('import-file').click()"
+                    class="pixel-button bg-stone-100 px-3 py-3 font-bold text-xs" title="导入数据">
+                    <i class="fas fa-upload"></i>
+                </button>
+                <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(this)">
+            </div>
+        </header>
+
+        <!-- DASHBOARD -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 pixel-border p-6 bg-[#FEFCF9]">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-lg font-bold">临期看板 / Kanban</h2>
+                    <span class="text-[10px] uppercase font-bold text-rose-500">Expiring Priority</span>
+                </div>
+                <div id="urgent-container" class="space-y-3 max-h-[250px] overflow-y-auto pr-2"></div>
+            </div>
+
+            <div class="pixel-border p-6 bg-white flex flex-col items-center">
+                <h3 class="font-bold mb-6 text-stone-400 text-[10px] uppercase">Inventory Pulse</h3>
+                <div class="chart-container"><canvas id="healthChart"></canvas></div>
+                <div id="stats-display"
+                    class="mt-6 grid grid-cols-3 gap-6 text-center w-full border-t-2 border-stone-50 pt-4"></div>
+            </div>
+        </div>
+
+        <!-- TABS SECTION -->
+        <section>
+            <div class="tabs">
+                <div onclick="switchTab('inventory')" id="tab-inventory" class="tab-btn active">冰箱库存</div>
+                <div onclick="switchTab('cookbook')" id="tab-cookbook" class="tab-btn">私家菜谱库 (优先)</div>
+            </div>
+
+            <div id="content-inventory" class="space-y-6">
+                <div id="inventory-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+
+            <div id="content-cookbook" class="hidden space-y-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">我的私藏菜谱</h3>
+                    <button onclick="openModal('recipe-modal')"
+                        class="pixel-button bg-peach px-4 py-2 text-xs font-bold">记录新菜谱 +</button>
+                </div>
+                <div id="cookbook-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+        </section>
+
+        <!-- RECIPE GENERATION -->
+        <section class="pixel-border p-8 bg-stone-50 border-dashed">
+            <div class="flex flex-col md:flex-row items-center gap-8 mb-10">
+                <div class="text-center md:text-left">
+                    <h2 class="text-2xl font-bold italic tracking-tight">Today's Menu.</h2>
+                    <p class="text-stone-500 text-xs mt-2">点击生成：优先推荐您的菜谱库，外部参考 Cook 及下厨房。</p>
+                </div>
+                <div class="flex-grow"></div>
+                <button id="gen-btn" onclick="generateRecipes()"
+                    class="pixel-button bg-stone-800 text-white px-10 py-4 font-bold tracking-widest hover:bg-black transition">
+                    CHEF RECOMMEND
+                </button>
+            </div>
+
+            <div id="recipe-display-area" class="space-y-10">
+                <div id="urgent-recipes" class="grid grid-cols-1 md:grid-cols-2 gap-8 hidden">
+                    <div class="col-span-full border-b-2 border-rose-100 pb-2 mb-2">
+                        <h4 class="text-rose-500 font-bold text-sm">✦ 临期抢救：必须消灭</h4>
+                    </div>
+                </div>
+                <div id="general-recipes" class="grid grid-cols-1 md:grid-cols-2 gap-8 hidden">
+                    <div class="col-span-full border-b-2 border-stone-200 pb-2 mb-2">
+                        <h4 class="text-stone-400 font-bold text-sm">✦ 全库推荐：美味搭配</h4>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- MODALS -->
+    <div id="add-modal"
+        class="fixed inset-0 bg-stone-900/40 hidden items-center justify-center z-50 p-6 backdrop-blur-sm">
+        <div class="pixel-border bg-white p-8 w-full max-w-md">
+            <h3 class="font-bold mb-6 uppercase">Manual Entry.</h3>
+            <form onsubmit="handleSaveItem(event)" class="space-y-4">
+                <input type="text" id="add-name" placeholder="名称..." required
+                    class="w-full border-2 border-stone-200 p-3 outline-none">
+                <div class="grid grid-cols-2 gap-4">
+                    <select id="add-loc" class="w-full border-2 border-stone-200 p-3 outline-none">
+                        <option value="cold">冷藏</option>
+                        <option value="frozen">冷冻</option>
+                    </select>
+                    <select id="add-cat" class="w-full border-2 border-stone-200 p-3 outline-none">
+                        <option value="veg">蔬菜</option>
+                        <option value="meat">肉类</option>
+                        <option value="milk">奶制品</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="date" id="add-buy" required class="w-full border-2 border-stone-200 p-2 text-xs">
+                    <input type="date" id="add-exp" required class="w-full border-2 border-stone-200 p-2 text-xs">
+                </div>
+                <button type="submit" class="w-full pixel-button bg-stone-800 text-white py-3 font-bold">SUBMIT</button>
+            </form>
+            <button onclick="closeModal('add-modal')"
+                class="mt-4 w-full text-stone-300 text-[10px] underline">CANCEL</button>
+        </div>
+    </div>
+
+    <div id="scan-modal"
+        class="fixed inset-0 bg-stone-900/40 hidden items-center justify-center z-50 p-6 backdrop-blur-sm">
+        <div class="pixel-border bg-white p-8 w-full max-w-lg">
+            <h3 class="font-bold mb-4 uppercase">AI Smart Scan.</h3>
+            <div class="space-y-6">
+                <div class="p-4 border-2 border-dashed border-stone-300 rounded text-center">
+                    <p class="text-[10px] text-stone-400 mb-2 uppercase">方式 1: 图片识别</p>
+                    <input type="file" id="image-input" accept="image/*" class="hidden" onchange="processImage(this)">
+                    <button onclick="document.getElementById('image-input').click()"
+                        class="pixel-button bg-stone-50 px-6 py-2 text-xs">选取照片</button>
+                </div>
+                <div class="relative">
+                    <p class="text-[10px] text-stone-400 mb-2 uppercase text-center">方式 2: 文字解析</p>
+                    <textarea id="text-input" placeholder="例: 昨天买了5个西红柿..."
+                        class="w-full border-2 border-stone-200 p-3 h-24 text-sm outline-none"></textarea>
+                    <button onclick="processText()"
+                        class="w-full pixel-button bg-yellow py-3 font-bold mt-2">解析文字</button>
+                </div>
+            </div>
+            <div id="scan-status" class="mt-4 text-[10px] text-center italic text-stone-500"></div>
+            <button onclick="closeModal('scan-modal')"
+                class="mt-4 w-full text-stone-300 text-[10px] underline">CLOSE</button>
+        </div>
+    </div>
+
+    <div id="recipe-modal"
+        class="fixed inset-0 bg-stone-900/40 hidden items-center justify-center z-50 p-6 backdrop-blur-sm">
+        <div class="pixel-border bg-white p-8 w-full max-w-lg">
+            <h3 class="font-bold mb-6 uppercase">Save Recipe.</h3>
+            <form onsubmit="handleSaveRecipe(event)" class="space-y-4">
+                <input type="text" id="rec-title" placeholder="菜谱名称..." required
+                    class="w-full border-2 border-stone-200 p-3 outline-none">
+                <textarea id="rec-ings" placeholder="所需主要食材..." required
+                    class="w-full border-2 border-stone-200 p-3 h-20 text-sm outline-none"></textarea>
+                <textarea id="rec-steps" placeholder="烹饪详细步骤..." required
+                    class="w-full border-2 border-stone-200 p-3 h-32 text-sm outline-none"></textarea>
+                <button type="submit" class="w-full pixel-button bg-peach py-3 font-bold">SAVE TO BOOK</button>
+            </form>
+            <button onclick="closeModal('recipe-modal')"
+                class="mt-4 w-full text-stone-300 text-[10px] underline">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal"
+        class="fixed inset-0 bg-stone-900/40 hidden items-center justify-center z-50 p-6 backdrop-blur-sm">
+        <div class="pixel-border bg-white p-8 w-full max-w-md">
+            <h3 class="font-bold mb-6 uppercase">Settings / 设置</h3>
+            <div class="space-y-6">
+                <div>
+                    <label class="text-[10px] uppercase font-bold text-stone-400 block mb-2">家庭码 / Household
+                        Code</label>
+                    <p class="text-[9px] text-stone-400 mb-2">在所有设备输入相同的家庭码即可同步数据</p>
+                    <input type="text" id="settings-household" placeholder="例如: mimi-home-2024"
+                        class="w-full border-2 border-stone-200 p-3 outline-none text-sm">
+                </div>
+                <div class="border-t border-stone-100 pt-4">
+                    <label class="text-[10px] uppercase font-bold text-stone-400 block mb-2">Gemini API Key</label>
+                    <p class="text-[9px] text-stone-400 mb-2">从 <a href="https://aistudio.google.com/apikey"
+                            target="_blank" class="underline text-blue-500">Google AI Studio</a> 获取免费的 API Key</p>
+                    <div class="flex gap-2">
+                        <input type="password" id="settings-apikey" placeholder="粘贴你的 API Key..."
+                            class="flex-grow border-2 border-stone-200 p-3 outline-none text-sm">
+                        <button onclick="toggleApiKeyVisibility()" class="pixel-button bg-stone-100 px-3 py-2 text-xs">
+                            <i id="apikey-eye" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="border-t border-stone-100 pt-4">
+                    <label class="text-[10px] uppercase font-bold text-stone-400 block mb-2">AI 模型</label>
+                    <select id="settings-model" class="w-full border-2 border-stone-200 p-3 outline-none text-sm">
+                        <option value="gemini-3-flash-preview" selected>Gemini 3 Flash Preview</option>
+                    </select>
+                </div>
+                <div class="border-t border-stone-100 pt-4">
+                    <label class="text-[10px] uppercase font-bold text-stone-400 block mb-2">数据管理</label>
+                    <div class="flex gap-3">
+                        <button onclick="clearAllData()"
+                            class="pixel-button bg-rose-100 px-4 py-2 text-xs font-bold text-rose-600">
+                            <i class="fas fa-trash-alt mr-1"></i>清空所有数据
+                        </button>
+                    </div>
+                    <p class="text-[8px] text-stone-300 mt-2">清空前建议先用导出按钮备份数据。</p>
+                </div>
+            </div>
+            <button onclick="saveSettings()"
+                class="mt-6 w-full pixel-button bg-stone-800 text-white py-3 font-bold">保存设置</button>
+            <button onclick="closeModal('settings-modal')"
+                class="mt-3 w-full text-stone-300 text-[10px] underline">CANCEL</button>
+        </div>
+    </div>
+
+    <script>
+        // === Supabase 配置 ===
+        const SUPABASE_URL = 'https://yeglyiexqhfwffptbjhh.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_XqDbZTpGyIueVBpFr2p8Iw__xn-elMo';
+        let sb = null; // 延迟初始化，等 CDN 加载完成
+
+        const STORAGE_KEYS = {
+            API_KEY: 'mimi_api_key',
+            MODEL: 'mimi_model',
+            HOUSEHOLD: 'mimi_household'
+        };
+
+        let apiKey = '';
+        let selectedModel = 'gemini-3-flash-preview';
+        let householdId = '';
+        let inventory = [];
+        let userRecipes = [];
+        let currentTab = 'inventory';
+        let mainChart = null;
+
+        // === 云端数据操作 ===
+        async function loadDataFromCloud() {
+            if (!householdId) return;
+            try {
+                console.log('[Mimi] 从云端加载数据, 家庭码:', householdId);
+                const { data: inv, error: e1 } = await sb
+                    .from('inventory').select('*')
+                    .eq('household_id', householdId).order('created_at', { ascending: false });
+                if (e1) throw e1;
+                inventory = (inv || []).map(i => ({
+                    id: i.id, name: i.name, loc: i.loc, cat: i.cat,
+                    buy: i.buy, exp: i.exp, qty: i.qty
+                }));
+
+                const { data: rec, error: e2 } = await sb
+                    .from('recipes').select('*')
+                    .eq('household_id', householdId).order('created_at', { ascending: false });
+                if (e2) throw e2;
+                userRecipes = (rec || []).map(r => ({
+                    id: r.id, title: r.title, ingredients: r.ingredients, steps: r.steps
+                }));
+
+                console.log(`[Mimi] 云端加载完成: ${inventory.length} 食材, ${userRecipes.length} 菜谱`);
+                renderAll();
+            } catch (e) {
+                console.error('[Mimi] 云端加载失败:', e.message);
+            }
+        }
+
+        async function addItemToCloud(item) {
+            if (!householdId) return item;
+            try {
+                const { data, error } = await sb.from('inventory').insert({
+                    household_id: householdId, name: item.name, loc: item.loc,
+                    cat: item.cat, buy: item.buy, exp: item.exp, qty: item.qty
+                }).select().single();
+                if (error) throw error;
+                return { id: data.id, name: data.name, loc: data.loc, cat: data.cat, buy: data.buy, exp: data.exp, qty: data.qty };
+            } catch (e) { console.error('[Mimi] 添加食材到云端失败:', e.message); return item; }
+        }
+
+        async function updateItemInCloud(id, updates) {
+            if (!householdId) return;
+            try {
+                await sb.from('inventory').update(updates).eq('id', id);
+            } catch (e) { console.error('[Mimi] 更新失败:', e.message); }
+        }
+
+        async function deleteItemFromCloud(id) {
+            if (!householdId) return;
+            try {
+                await sb.from('inventory').delete().eq('id', id);
+            } catch (e) { console.error('[Mimi] 删除失败:', e.message); }
+        }
+
+        async function addRecipeToCloud(recipe) {
+            if (!householdId) return recipe;
+            try {
+                const { data, error } = await sb.from('recipes').insert({
+                    household_id: householdId, title: recipe.title,
+                    ingredients: recipe.ingredients, steps: recipe.steps
+                }).select().single();
+                if (error) throw error;
+                return { id: data.id, title: data.title, ingredients: data.ingredients, steps: data.steps };
+            } catch (e) { console.error('[Mimi] 添加菜谱到云端失败:', e.message); return recipe; }
+        }
+
+        async function deleteRecipeFromCloud(id) {
+            if (!householdId) return;
+            try {
+                await sb.from('recipes').delete().eq('id', id);
+            } catch (e) { console.error('[Mimi] 删除菜谱失败:', e.message); }
+        }
+
+        async function clearAllDataFromCloud() {
+            if (!householdId) return;
+            try {
+                await sb.from('inventory').delete().eq('household_id', householdId);
+                await sb.from('recipes').delete().eq('household_id', householdId);
+            } catch (e) { console.error('[Mimi] 清空云端数据失败:', e.message); }
+        }
+
+        // === 本地设置 ===
+        function loadLocalSettings() {
+            apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
+            selectedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || 'gemini-3-flash-preview';
+            householdId = localStorage.getItem(STORAGE_KEYS.HOUSEHOLD) || '';
+        }
+
+        async function saveSettings() {
+            apiKey = document.getElementById('settings-apikey').value.trim();
+            selectedModel = document.getElementById('settings-model').value;
+            const newHousehold = document.getElementById('settings-household').value.trim();
+            localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+            localStorage.setItem(STORAGE_KEYS.MODEL, selectedModel);
+            const householdChanged = newHousehold !== householdId;
+            householdId = newHousehold;
+            localStorage.setItem(STORAGE_KEYS.HOUSEHOLD, householdId);
+            closeModal('settings-modal');
+            if (householdChanged && householdId) {
+                await loadDataFromCloud();
+            }
+            updateMimi();
+        }
+
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('settings-apikey');
+            const icon = document.getElementById('apikey-eye');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+
+        function exportData() {
+            const data = { inventory, recipes: userRecipes, exportDate: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mimi_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function importData(input) {
+            if (!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    const data = JSON.parse(reader.result);
+                    if (data.inventory && householdId) {
+                        for (const item of data.inventory) {
+                            const saved = await addItemToCloud(item);
+                            inventory.push(saved);
+                        }
+                    }
+                    if (data.recipes && householdId) {
+                        for (const r of data.recipes) {
+                            const saved = await addRecipeToCloud(r);
+                            userRecipes.push(saved);
+                        }
+                    }
+                    renderAll();
+                    alert('数据导入成功！');
+                } catch (e) { alert('导入失败: ' + e.message); }
+            };
+            reader.readAsText(input.files[0]);
+            input.value = '';
+        }
+
+        async function clearAllData() {
+            if (!confirm('确定要清空所有数据吗？建议先导出备份！')) return;
+            if (!confirm('再次确认：这将删除所有食材和菜谱数据，不可恢复！')) return;
+            await clearAllDataFromCloud();
+            inventory = [];
+            userRecipes = [];
+            renderAll();
+        }
+
+        function getDays(expStr) {
+            const diff = new Date(expStr) - new Date().setHours(0, 0, 0, 0);
+            return Math.ceil(diff / (1000 * 60 * 60 * 24));
+        }
+
+        function extractJson(str) {
+            if (!str) throw new Error('Empty response');
+            // 去除 markdown 代码块标记 (```json ... ```)
+            let cleaned = str.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '');
+            try {
+                const first = Math.min(cleaned.indexOf('{') === -1 ? Infinity : cleaned.indexOf('{'), cleaned.indexOf('[') === -1 ? Infinity : cleaned.indexOf('['));
+                const last = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+                if (first === Infinity || last === -1) throw new Error('No JSON found in response');
+                return JSON.parse(cleaned.slice(first, last + 1));
+            } catch (e) {
+                console.error('JSON 解析失败, 原始响应:', str);
+                throw e;
+            }
+        }
+
+        async function geminiCall(prompt, imageData = null) {
+            if (!apiKey) {
+                alert('请先在「设置」中配置 Gemini API Key！\n\n可从 https://aistudio.google.com/apikey 免费获取。');
+                openModal('settings-modal');
+                return null;
+            }
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            const requestBody = {
+                contents: [{ parts: [{ text: prompt }] }]
+            };
+            if (imageData) requestBody.contents[0].parts.push({ inlineData: { mimeType: "image/png", data: imageData } });
+
+            const maxRetries = 2;
+            let lastError = '';
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    console.log(`[Mimi] API 调用中... 模型: ${selectedModel}, 尝试 ${i + 1}/${maxRetries}`);
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (!resp.ok) {
+                        const errData = await resp.json().catch(() => ({}));
+                        const errMsg = errData.error?.message || resp.statusText;
+                        console.error(`[Mimi] API 错误 (${resp.status}):`, errMsg);
+                        lastError = `${resp.status}: ${errMsg}`;
+
+                        // Auth/key errors - don't retry
+                        if (resp.status === 401 || resp.status === 403) {
+                            alert(`API Key 无效 (${resp.status})\n\n${errMsg}\n\n请检查「设置」中的 API Key。`);
+                            openModal('settings-modal');
+                            return null;
+                        }
+                        // Model not found
+                        if (resp.status === 404) {
+                            alert(`模型 "${selectedModel}" 不存在\n\n请在「设置」中切换其他模型。`);
+                            openModal('settings-modal');
+                            return null;
+                        }
+                        // Rate limit or other - retry
+                        if (i < maxRetries - 1) {
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        break;
+                    }
+
+                    const data = await resp.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    console.log('[Mimi] API 响应成功, 长度:', text?.length);
+                    return text;
+                } catch (e) {
+                    lastError = e.message;
+                    console.error(`[Mimi] 网络请求失败 (尝试 ${i + 1}):`, e.message);
+                    if (i < maxRetries - 1) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+            }
+            alert(`API 请求失败\n\n错误详情: ${lastError}\n\n请检查网络连接或在「设置」中切换模型后重试。`);
+            return null;
+        }
+
+        async function processText() {
+            const text = document.getElementById('text-input').value;
+            if (!text) return;
+            document.getElementById('scan-status').innerText = "米米正在阅读...";
+            const prompt = `你是一个冰箱管家，从文字中识别食材，仅输出 JSON 数组格式：[{name, category, buyDate, expiryDate}]。文字内容：${text}`;
+            const result = await geminiCall(prompt);
+            handleAiResult(result);
+        }
+
+        async function processImage(input) {
+            if (!input.files[0]) return;
+            document.getElementById('scan-status').innerText = "米米正在扫描图片...";
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const base64 = reader.result.split(',')[1];
+                const prompt = `识别图中食材，仅输出 JSON 数组。`;
+                const result = await geminiCall(prompt, base64);
+                handleAiResult(result);
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        async function handleAiResult(rawText) {
+            try {
+                const newItems = extractJson(rawText);
+                if (Array.isArray(newItems)) {
+                    for (const item of newItems) {
+                        item.qty = 100;
+                        const saved = await addItemToCloud(item);
+                        inventory.push(saved);
+                    }
+                    document.getElementById('scan-status').innerText = "录入成功！";
+                    setTimeout(() => { closeModal('scan-modal'); renderAll(); }, 1000);
+                }
+            } catch (e) { document.getElementById('scan-status').innerText = "失败，请重试。"; }
+        }
+
+        // --- Recipe Generation ---
+        async function generateRecipes() {
+            const btn = document.getElementById('gen-btn');
+            btn.disabled = true;
+            btn.innerText = "CHEF IS COOKING...";
+
+            try {
+                const urgentItems = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).map(i => i.name).join(',');
+                const allItems = inventory.filter(i => i.qty > 0).map(i => i.name).join(',');
+
+                if (!allItems) {
+                    alert('冰箱里没有食材，请先添加一些食材再生成菜谱！');
+                    return;
+                }
+
+                const cookbookCtx = userRecipes.length > 0 ? userRecipes.map(r => `[菜名: ${r.title}, 食材: ${r.ingredients}]`).join('\n') : "无";
+
+                const prompt = `你现在是顶级大厨米米。
+冰箱现有食材：${allItems}
+临期需消耗食材：${urgentItems || '无'}
+私家菜谱库：${cookbookCtx}
+
+任务要求：
+1. 优先从私家库匹配。
+2. 对于非私家菜谱，请生成极其详细的烹饪步骤。
+3. 提供该菜谱的具体搜索链接跳转到下厨房：https://www.xiachufang.com/search/?keyword=[菜名]
+4. 严格返回以下 JSON 格式（不要包含任何其他文字）：
+{ "urgent": [{"title": "菜名", "desc": "简介", "steps": ["步骤1", "步骤2"], "fromCookbook": false, "detailLink": "链接"}], "general": [{"title": "菜名", "desc": "简介", "steps": ["步骤1", "步骤2"], "fromCookbook": false, "detailLink": "链接"}] }`;
+
+                const result = await geminiCall(prompt);
+
+                if (!result) {
+                    // geminiCall already showed alert if needed
+                    return;
+                }
+
+                const data = extractJson(result);
+                renderRecipeResults(data);
+            } catch (e) {
+                console.error('[Mimi] 菜谱生成失败:', e);
+                document.getElementById('urgent-recipes').innerHTML = '<div class="col-span-full text-rose-500 p-4">生成出错：' + e.message + '</div>';
+                document.getElementById('urgent-recipes').classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "CHEF RECOMMEND";
+            }
+        }
+
+        function renderRecipeResults(data) {
+            const urgentDiv = document.getElementById('urgent-recipes');
+            const generalDiv = document.getElementById('general-recipes');
+
+            const renderCard = (r, isUrgent) => {
+                // 确保跳转链接始终有效，优先级：AI生成的detailLink > 下厨房搜索
+                const searchLink = r.detailLink || `https://www.xiachufang.com/search/?keyword=${encodeURIComponent(r.title)}`;
+                const cookLink = `https://cook.zhangjc.tech/?ingredients=${encodeURIComponent(r.title)}`;
+
+                return `
+                <div class="pixel-border p-6 ${isUrgent ? 'bg-rose-50' : 'bg-white'} flex flex-col h-full">
+                    <div class="flex justify-between items-start mb-3">
+                        <h5 class="font-bold text-lg">/ ${r.title}</h5>
+                        ${r.fromCookbook ? '<span class="text-[8px] bg-peach px-2 py-0.5 font-bold">私家秘籍</span>' : '<span class="text-[8px] bg-stone-100 px-2 py-0.5 font-bold">米米大厨</span>'}
+                    </div>
+                    <p class="text-[11px] text-stone-400 mb-4 line-clamp-2">${r.desc || '美味烹饪推荐。'}</p>
+                    <div class="space-y-2 border-l-2 border-stone-800 pl-3 flex-grow mb-6">
+                        ${(r.steps || []).map((s, idx) => `<div class="text-[10px] leading-relaxed"><span class="font-bold">#${idx + 1}</span> ${s}</div>`).join('')}
+                    </div>
+                    
+                    ${!r.fromCookbook ? `
+                    <div class="flex flex-col gap-3 border-t border-stone-100 pt-4">
+                        <a href="${searchLink}" target="_blank" class="flex items-center text-[10px] text-blue-600 font-bold underline uppercase tracking-widest hover:text-blue-800">
+                            <i class="fas fa-external-link-alt mr-2"></i> 查看具体菜谱步骤 →
+                        </a>
+                        <a href="${cookLink}" target="_blank" class="text-[8px] text-stone-400 underline hover:text-stone-600">
+                            在 Cook 平台查看食材组合
+                        </a>
+                    </div>
+                    ` : '<div class="text-[9px] text-stone-400 italic">来自您的私家秘籍库。</div>'}
+                </div>
+            `};
+
+            urgentDiv.innerHTML = '<div class="col-span-full border-b-2 border-rose-100 pb-2 mb-2"><h4 class="text-rose-500 font-bold text-sm">✦ 临期抢救</h4></div>' + (data.urgent || []).map(r => renderCard(r, true)).join('');
+            generalDiv.innerHTML = '<div class="col-span-full border-b-2 border-stone-200 pb-2 mb-2"><h4 class="text-stone-400 font-bold text-sm">✦ 大厨推荐</h4></div>' + (data.general || []).map(r => renderCard(r, false)).join('');
+            urgentDiv.classList.remove('hidden'); generalDiv.classList.remove('hidden');
+        }
+
+        // --- Core UI & Logic ---
+        function renderAll() { renderInventory(); renderUrgent(); renderStats(); renderCookbook(); updateMimi(); }
+
+        function renderInventory() {
+            const grid = document.getElementById('inventory-grid');
+            grid.innerHTML = inventory.filter(i => i.qty > 0).map(i => `
+                <div class="pixel-border p-4 bg-white">
+                    <div class="flex justify-between mb-3">
+                        <h4 class="font-bold text-sm">${i.name}</h4>
+                        <span class="text-[8px] bg-stone-800 text-white px-2 py-1">${(i.loc || 'cold').toUpperCase()}</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-[9px] font-bold">
+                            <span>STOCK / ${i.qty}%</span>
+                            <span class="${getDays(i.exp) <= 3 ? 'text-rose-500' : ''}">EXP / ${getDays(i.exp)}D</span>
+                        </div>
+                        <input type="range" value="${i.qty}" min="0" max="100" step="10" class="w-full" oninput="updateQty(${i.id}, this.value)">
+                    </div>
+                    <div class="mt-4 pt-2 border-t border-stone-50 flex justify-between">
+                        <span class="text-[8px] text-stone-300">EXP: ${i.exp}</span>
+                        <button onclick="removeItem(${i.id})" class="text-stone-200 hover:text-rose-500"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderUrgent() {
+            const itemsUrgent = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).sort((a, b) => getDays(a.exp) - getDays(b.exp));
+            const container = document.getElementById('urgent-container');
+            if (itemsUrgent.length === 0) { container.innerHTML = `<div class="text-center py-10 text-stone-300 text-[10px]">冰箱目前很新鲜安全。</div>`; return; }
+            container.innerHTML = itemsUrgent.map(i => `
+                <div class="border-b border-stone-100 py-2 flex justify-between items-center bg-white px-2">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm">${i.cat === 'veg' ? '🥦' : (i.cat === 'meat' ? '🥩' : '🍎')}</span>
+                        <div class="text-[10px] font-bold">${i.name}</div>
+                    </div>
+                    <div class="text-[9px] font-bold ${getDays(i.exp) < 0 ? 'text-rose-500' : 'text-amber-500'}">
+                        ${getDays(i.exp) < 0 ? '已过期' : '剩 ' + getDays(i.exp) + ' 天'}
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderStats() {
+            const fresh = inventory.filter(i => getDays(i.exp) > 3 && i.qty > 0).length;
+            const soon = inventory.filter(i => getDays(i.exp) <= 3 && getDays(i.exp) >= 0 && i.qty > 0).length;
+            const exp = inventory.filter(i => getDays(i.exp) < 0 && i.qty > 0).length;
+            document.getElementById('stats-display').innerHTML = `
+                <div class="text-[10px]"><span class="block text-emerald-500 font-bold text-sm">${fresh}</span>FRESH</div>
+                <div class="text-[10px]"><span class="block text-amber-500 font-bold text-sm">${soon}</span>WARN</div>
+                <div class="text-[10px]"><span class="block text-rose-500 font-bold text-sm">${exp}</span>EXP</div>`;
+            const ctx = document.getElementById('healthChart').getContext('2d');
+            if (mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { datasets: [{ data: [fresh, soon, exp], backgroundColor: ['#A3C9A8', '#FDE2A4', '#FABEBE'], borderWidth: 2, borderColor: '#3D3D3D' }] },
+                options: { responsive: true, cutout: '75%', plugins: { legend: { display: false } } }
+            });
+        }
+
+        function renderCookbook() {
+            const grid = document.getElementById('cookbook-grid');
+            if (userRecipes.length === 0) { grid.innerHTML = `<div class="col-span-full text-center py-20 text-stone-300 text-xs">书架还是空的，快记录你的拿手好菜。</div>`; return; }
+            grid.innerHTML = userRecipes.map(r => `
+                <div class="pixel-border p-6 bg-white">
+                    <div class="flex justify-between items-start mb-4">
+                        <h4 class="font-bold">✦ ${r.title}</h4>
+                        <button onclick="removeRecipe(${r.id})" class="text-stone-200 hover:text-rose-500"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <p class="text-[10px] text-stone-500 mb-2">${r.ingredients}</p>
+                    <p class="text-[11px] leading-relaxed line-clamp-2">${r.steps}</p>
+                </div>`).join('');
+        }
+
+        function updateMimi() {
+            const urgentCount = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).length;
+            const speech = document.getElementById('mimi-speech');
+            if (speech) speech.innerText = urgentCount > 0 ? `吱吱！有 ${urgentCount} 件食材快到期了，快用掉它们！` : `你好！大厨米米已经准备好为你服务了。`;
+        }
+
+        function updateQty(id, val) {
+            const item = inventory.find(i => i.id == id);
+            if (item) {
+                item.qty = parseInt(val);
+                if (item.qty === 0) {
+                    if (confirm("吃完了吗？")) { removeItem(id); return; }
+                }
+                updateItemInCloud(id, { qty: item.qty });
+                renderAll();
+            }
+        }
+        async function removeItem(id) { inventory = inventory.filter(i => i.id != id); await deleteItemFromCloud(id); renderAll(); }
+        async function removeRecipe(id) { userRecipes = userRecipes.filter(r => r.id != id); await deleteRecipeFromCloud(id); renderCookbook(); }
+        async function handleSaveItem(e) {
+            e.preventDefault();
+            const newItem = { name: document.getElementById('add-name').value, loc: document.getElementById('add-loc').value, cat: document.getElementById('add-cat').value, buy: document.getElementById('add-buy').value, exp: document.getElementById('add-exp').value, qty: 100 };
+            const saved = await addItemToCloud(newItem);
+            inventory.push(saved);
+            closeModal('add-modal'); renderAll(); e.target.reset();
+        }
+        async function handleSaveRecipe(e) {
+            e.preventDefault();
+            const newRecipe = { title: document.getElementById('rec-title').value, ingredients: document.getElementById('rec-ings').value, steps: document.getElementById('rec-steps').value };
+            const saved = await addRecipeToCloud(newRecipe);
+            userRecipes.push(saved);
+            closeModal('recipe-modal'); renderCookbook(); e.target.reset();
+        }
+        function switchTab(t) { currentTab = t; document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active')); document.getElementById('tab-' + t).classList.add('active'); document.getElementById('content-inventory').classList.toggle('hidden', t !== 'inventory'); document.getElementById('content-cookbook').classList.toggle('hidden', t !== 'cookbook'); }
+        function openModal(id) {
+            document.getElementById(id).classList.replace('hidden', 'flex');
+            if (id === 'settings-modal') {
+                const hInput = document.getElementById('settings-household');
+                if (hInput) hInput.value = householdId;
+            }
+        }
+        function closeModal(id) { document.getElementById(id).classList.replace('flex', 'hidden'); }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 初始化 Supabase 客户端
+            sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log('[Mimi] Supabase 客户端已初始化');
+
+            // 加载本地设置
+            loadLocalSettings();
+
+            // 设置默认日期
+            const buyInput = document.getElementById('add-buy');
+            const expInput = document.getElementById('add-exp');
+            if (buyInput) buyInput.value = new Date().toISOString().split('T')[0];
+            if (expInput) expInput.value = new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0];
+
+            // 填入设置表单
+            const apikeyInput = document.getElementById('settings-apikey');
+            const modelSelect = document.getElementById('settings-model');
+            if (apikeyInput && apiKey) apikeyInput.value = apiKey;
+            if (modelSelect && selectedModel) modelSelect.value = selectedModel;
+
+            // 从云端加载数据
+            if (householdId) {
+                await loadDataFromCloud();
+            } else {
+                renderAll();
+            }
+
+            // 提示
+            if (!householdId) {
+                const speech = document.getElementById('mimi-speech');
+                if (speech) speech.innerText = '欢迎！请点击「设置」输入家庭码和 API Key 开始使用。';
+            } else if (!apiKey) {
+                const speech = document.getElementById('mimi-speech');
+                if (speech) speech.innerText = '提示：请点击「设置」配置 API Key 来启用 AI 功能！';
+            }
+        });
+    </script>
+</body>
+
+</html>

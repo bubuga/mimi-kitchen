@@ -742,7 +742,16 @@
             const text = document.getElementById('text-input').value;
             if (!text) return;
             document.getElementById('scan-status').innerText = "米米正在阅读...";
-            const prompt = `你是一个冰箱管家，从文字中识别食材，仅输出 JSON 数组格式：[{name, category, buyDate, expiryDate}]。文字内容：${text}`;
+            const today = new Date().toISOString().split('T')[0];
+            const prompt = `你是一个冰箱管家，从文字中识别食材。今天日期是 ${today}。
+仅输出 JSON 数组，每个元素包含以下字段：
+- name: 食材名称
+- loc: 存储位置，"cold"(冷藏) 或 "frozen"(冷冻)
+- cat: 分类，"veg"(蔬菜) 或 "meat"(肉类) 或 "milk"(奶制品) 或 "other"(其他)
+- buy: 购买日期，YYYY-MM-DD 格式
+- exp: 过期日期，YYYY-MM-DD 格式
+示例: [{"name":"西红柿","loc":"cold","cat":"veg","buy":"2024-01-01","exp":"2024-01-06"}]
+文字内容：${text}`;
             const result = await geminiCall(prompt);
             handleAiResult(result);
         }
@@ -753,7 +762,8 @@
             const reader = new FileReader();
             reader.onload = async () => {
                 const base64 = reader.result.split(',')[1];
-                const prompt = `识别图中食材，仅输出 JSON 数组。`;
+                const today = new Date().toISOString().split('T')[0];
+                const prompt = `识别图中食材，今天是 ${today}。仅输出 JSON 数组，字段: name(名称), loc("cold"或"frozen"), cat("veg"/"meat"/"milk"/"other"), buy(YYYY-MM-DD), exp(YYYY-MM-DD)。`;
                 const result = await geminiCall(prompt, base64);
                 handleAiResult(result);
             };
@@ -764,15 +774,32 @@
             try {
                 const newItems = extractJson(rawText);
                 if (Array.isArray(newItems)) {
+                    const today = new Date().toISOString().split('T')[0];
+                    const weekLater = new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0];
                     for (const item of newItems) {
-                        item.qty = 100;
-                        const saved = await addItemToCloud(item);
+                        // 字段映射：兼容 AI 可能返回的不同字段名
+                        const mapped = {
+                            name: item.name || item.名称 || '未知食材',
+                            loc: item.loc || item.location || 'cold',
+                            cat: item.cat || item.category || item.分类 || 'other',
+                            buy: item.buy || item.buyDate || item.购买日期 || today,
+                            exp: item.exp || item.expiryDate || item.过期日期 || weekLater,
+                            qty: 100
+                        };
+                        // 规范化 cat 值
+                        if (!['veg', 'meat', 'milk', 'other'].includes(mapped.cat)) {
+                            mapped.cat = mapped.cat.includes('肉') ? 'meat' : mapped.cat.includes('奶') ? 'milk' : mapped.cat.includes('菜') || mapped.cat.includes('果') ? 'veg' : 'other';
+                        }
+                        const saved = await addItemToCloud(mapped);
                         inventory.push(saved);
                     }
-                    document.getElementById('scan-status').innerText = "录入成功！";
-                    setTimeout(() => { closeModal('scan-modal'); renderAll(); }, 1000);
+                    document.getElementById('scan-status').innerText = `录入成功！已添加 ${newItems.length} 个食材`;
+                    setTimeout(() => { closeModal('scan-modal'); renderAll(); }, 1500);
                 }
-            } catch (e) { document.getElementById('scan-status').innerText = "失败，请重试。"; }
+            } catch (e) {
+                console.error('[Mimi] AI 录入失败:', e);
+                document.getElementById('scan-status').innerText = "失败，请重试。错误: " + e.message;
+            }
         }
 
         // --- Recipe Generation ---

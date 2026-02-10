@@ -379,26 +379,41 @@
     </div>
 
     <div id="scan-modal"
-        class="fixed inset-0 bg-stone-900/40 hidden items-center justify-center z-50 p-6 backdrop-blur-sm">
-        <div class="pixel-border bg-white p-8 w-full max-w-lg">
+        class="fixed inset-0 bg-stone-900/40 hidden items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
+        <div class="pixel-border bg-white p-6 w-full max-w-2xl my-4">
             <h3 class="font-bold mb-4 uppercase">AI Smart Scan.</h3>
-            <div class="space-y-6">
+            <div id="scan-input-area" class="space-y-6">
                 <div class="p-4 border-2 border-dashed border-stone-300 rounded text-center">
-                    <p class="text-[10px] text-stone-400 mb-2 uppercase">方式 1: 图片识别</p>
+                    <p class="text-[10px] text-stone-400 mb-2 uppercase">方式 1: 图片识别（购物截图 / 冰箱照片）</p>
                     <input type="file" id="image-input" accept="image/*" class="hidden" onchange="processImage(this)">
                     <button onclick="document.getElementById('image-input').click()"
                         class="pixel-button bg-stone-50 px-6 py-2 text-xs">选取照片</button>
                 </div>
                 <div class="relative">
                     <p class="text-[10px] text-stone-400 mb-2 uppercase text-center">方式 2: 文字解析</p>
-                    <textarea id="text-input" placeholder="例: 昨天买了5个西红柿..."
+                    <textarea id="text-input" placeholder="例: 昨天买了5个西红柿和一盒牛奶..."
                         class="w-full border-2 border-stone-200 p-3 h-24 text-sm outline-none"></textarea>
                     <button onclick="processText()"
                         class="w-full pixel-button bg-yellow py-3 font-bold mt-2">解析文字</button>
                 </div>
             </div>
+
+            <!-- 预览区域 -->
+            <div id="scan-preview" class="hidden mt-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-bold text-sm">识别结果 — 请确认并编辑</h4>
+                    <button onclick="resetScan()" class="text-[10px] text-stone-400 underline">重新扫描</button>
+                </div>
+                <div id="scan-preview-list" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1"></div>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="confirmScanItems()" class="flex-grow pixel-button bg-mint py-3 font-bold text-sm">✓
+                        确认添加选中项</button>
+                    <button onclick="resetScan()" class="pixel-button bg-stone-100 px-4 py-3 text-xs">取消</button>
+                </div>
+            </div>
+
             <div id="scan-status" class="mt-4 text-[10px] text-center italic text-stone-500"></div>
-            <button onclick="closeModal('scan-modal')"
+            <button onclick="closeModal('scan-modal'); resetScan();"
                 class="mt-4 w-full text-stone-300 text-[10px] underline">CLOSE</button>
         </div>
     </div>
@@ -738,18 +753,21 @@
             return null;
         }
 
+        let pendingScanItems = []; // AI 识别后的待确认列表
+
         async function processText() {
             const text = document.getElementById('text-input').value;
             if (!text) return;
             document.getElementById('scan-status').innerText = "米米正在阅读...";
             const today = new Date().toISOString().split('T')[0];
             const prompt = `你是一个冰箱管家，从文字中识别食材。今天日期是 ${today}。
+所有食材名称必须使用中文。如果原文是英文，请翻译成中文。
 仅输出 JSON 数组，每个元素包含以下字段：
-- name: 食材名称
+- name: 食材名称（中文）
 - loc: 存储位置，"cold"(冷藏) 或 "frozen"(冷冻)
-- cat: 分类，"veg"(蔬菜) 或 "meat"(肉类) 或 "milk"(奶制品) 或 "other"(其他)
+- cat: 分类，"veg"(蔬菜水果) 或 "meat"(肉类) 或 "milk"(奶制品) 或 "other"(其他)
 - buy: 购买日期，YYYY-MM-DD 格式
-- exp: 过期日期，YYYY-MM-DD 格式
+- exp: 预计过期日期，YYYY-MM-DD 格式（根据食材类型合理推断）
 示例: [{"name":"西红柿","loc":"cold","cat":"veg","buy":"2024-01-01","exp":"2024-01-06"}]
 文字内容：${text}`;
             const result = await geminiCall(prompt);
@@ -763,43 +781,139 @@
             reader.onload = async () => {
                 const base64 = reader.result.split(',')[1];
                 const today = new Date().toISOString().split('T')[0];
-                const prompt = `识别图中食材，今天是 ${today}。仅输出 JSON 数组，字段: name(名称), loc("cold"或"frozen"), cat("veg"/"meat"/"milk"/"other"), buy(YYYY-MM-DD), exp(YYYY-MM-DD)。`;
+                const prompt = `识别图中所有食材或食品，今天是 ${today}。
+所有名称必须翻译成中文。
+仅输出 JSON 数组，字段:
+- name: 食材名称（中文）
+- loc: "cold" 或 "frozen"
+- cat: "veg"(蔬菜水果) / "meat"(肉类) / "milk"(奶制品) / "other"(其他，包括面粉、面包等)
+- buy: 购买日期 YYYY-MM-DD
+- exp: 预计过期日期 YYYY-MM-DD（根据食材类型合理推断保质期）`;
                 const result = await geminiCall(prompt, base64);
                 handleAiResult(result);
             };
             reader.readAsDataURL(input.files[0]);
         }
 
-        async function handleAiResult(rawText) {
+        function handleAiResult(rawText) {
             try {
                 const newItems = extractJson(rawText);
-                if (Array.isArray(newItems)) {
-                    const today = new Date().toISOString().split('T')[0];
-                    const weekLater = new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0];
-                    for (const item of newItems) {
-                        // 字段映射：兼容 AI 可能返回的不同字段名
-                        const mapped = {
-                            name: item.name || item.名称 || '未知食材',
-                            loc: item.loc || item.location || 'cold',
-                            cat: item.cat || item.category || item.分类 || 'other',
-                            buy: item.buy || item.buyDate || item.购买日期 || today,
-                            exp: item.exp || item.expiryDate || item.过期日期 || weekLater,
-                            qty: 100
-                        };
-                        // 规范化 cat 值
-                        if (!['veg', 'meat', 'milk', 'other'].includes(mapped.cat)) {
-                            mapped.cat = mapped.cat.includes('肉') ? 'meat' : mapped.cat.includes('奶') ? 'milk' : mapped.cat.includes('菜') || mapped.cat.includes('果') ? 'veg' : 'other';
-                        }
-                        const saved = await addItemToCloud(mapped);
-                        inventory.push(saved);
-                    }
-                    document.getElementById('scan-status').innerText = `录入成功！已添加 ${newItems.length} 个食材`;
-                    setTimeout(() => { closeModal('scan-modal'); renderAll(); }, 1500);
+                if (!Array.isArray(newItems) || newItems.length === 0) {
+                    document.getElementById('scan-status').innerText = "未识别到食材，请重试。";
+                    return;
                 }
+                const today = new Date().toISOString().split('T')[0];
+                const weekLater = new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0];
+
+                // 字段映射 + 规范化
+                pendingScanItems = newItems.map((item, i) => {
+                    let cat = item.cat || item.category || item.分类 || 'other';
+                    if (!['veg', 'meat', 'milk', 'other'].includes(cat)) {
+                        cat = cat.includes('肉') ? 'meat' : cat.includes('奶') ? 'milk' : cat.includes('菜') || cat.includes('果') ? 'veg' : 'other';
+                    }
+                    return {
+                        checked: true,
+                        name: item.name || item.名称 || '未知食材',
+                        loc: item.loc || item.location || 'cold',
+                        cat: cat,
+                        buy: item.buy || item.buyDate || item.购买日期 || today,
+                        exp: item.exp || item.expiryDate || item.过期日期 || weekLater
+                    };
+                });
+
+                renderScanPreview();
             } catch (e) {
-                console.error('[Mimi] AI 录入失败:', e);
-                document.getElementById('scan-status').innerText = "失败，请重试。错误: " + e.message;
+                console.error('[Mimi] AI 解析失败:', e);
+                document.getElementById('scan-status').innerText = "解析失败，请重试。";
             }
+        }
+
+        function renderScanPreview() {
+            document.getElementById('scan-input-area').classList.add('hidden');
+            document.getElementById('scan-preview').classList.remove('hidden');
+            document.getElementById('scan-status').innerText = `识别到 ${pendingScanItems.length} 个食材，请确认后添加`;
+
+            const catLabels = { veg: '🥦 蔬果', meat: '🥩 肉类', milk: '🥛 奶品', other: '📦 其他' };
+            const locLabels = { cold: '❄️ 冷藏', frozen: '🧊 冷冻' };
+
+            const list = document.getElementById('scan-preview-list');
+            list.innerHTML = pendingScanItems.map((item, i) => `
+                <div class="border-2 ${item.checked ? 'border-stone-300' : 'border-stone-100 opacity-50'} rounded p-3 bg-stone-50 transition-all" id="scan-item-${i}">
+                    <div class="flex items-center gap-2 mb-2">
+                        <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleScanItem(${i}, this.checked)" class="w-4 h-4 accent-emerald-500">
+                        <input type="text" value="${item.name}" id="scan-name-${i}" class="flex-grow font-bold text-sm border-b border-stone-300 bg-transparent outline-none px-1 py-0.5">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                            <label class="text-stone-400 block mb-0.5">分类</label>
+                            <select id="scan-cat-${i}" class="w-full border border-stone-200 rounded px-2 py-1 bg-white text-xs">
+                                ${Object.entries(catLabels).map(([k, v]) => `<option value="${k}" ${item.cat === k ? 'selected' : ''}>${v}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-stone-400 block mb-0.5">存储</label>
+                            <select id="scan-loc-${i}" class="w-full border border-stone-200 rounded px-2 py-1 bg-white text-xs">
+                                ${Object.entries(locLabels).map(([k, v]) => `<option value="${k}" ${item.loc === k ? 'selected' : ''}>${v}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-stone-400 block mb-0.5">购买日期</label>
+                            <input type="date" value="${item.buy}" id="scan-buy-${i}" class="w-full border border-stone-200 rounded px-2 py-1 bg-white text-xs">
+                        </div>
+                        <div>
+                            <label class="text-stone-400 block mb-0.5">过期日期</label>
+                            <input type="date" value="${item.exp}" id="scan-exp-${i}" class="w-full border border-stone-200 rounded px-2 py-1 bg-white text-xs">
+                        </div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function toggleScanItem(index, checked) {
+            pendingScanItems[index].checked = checked;
+            const el = document.getElementById(`scan-item-${index}`);
+            if (el) {
+                el.classList.toggle('border-stone-300', checked);
+                el.classList.toggle('border-stone-100', !checked);
+                el.classList.toggle('opacity-50', !checked);
+            }
+        }
+
+        async function confirmScanItems() {
+            const selected = pendingScanItems.filter((_, i) => {
+                const cb = document.querySelector(`#scan-item-${i} input[type="checkbox"]`);
+                return cb && cb.checked;
+            });
+            if (selected.length === 0) { document.getElementById('scan-status').innerText = "请至少选择一个食材"; return; }
+
+            document.getElementById('scan-status').innerText = "正在保存...";
+            let count = 0;
+            for (let i = 0; i < pendingScanItems.length; i++) {
+                const cb = document.querySelector(`#scan-item-${i} input[type="checkbox"]`);
+                if (!cb || !cb.checked) continue;
+                const item = {
+                    name: document.getElementById(`scan-name-${i}`).value,
+                    cat: document.getElementById(`scan-cat-${i}`).value,
+                    loc: document.getElementById(`scan-loc-${i}`).value,
+                    buy: document.getElementById(`scan-buy-${i}`).value,
+                    exp: document.getElementById(`scan-exp-${i}`).value,
+                    qty: 100
+                };
+                const saved = await addItemToCloud(item);
+                inventory.push(saved);
+                count++;
+            }
+            document.getElementById('scan-status').innerText = `✓ 已添加 ${count} 个食材！`;
+            setTimeout(() => { closeModal('scan-modal'); resetScan(); renderAll(); }, 1200);
+        }
+
+        function resetScan() {
+            pendingScanItems = [];
+            document.getElementById('scan-input-area').classList.remove('hidden');
+            document.getElementById('scan-preview').classList.add('hidden');
+            document.getElementById('scan-preview-list').innerHTML = '';
+            document.getElementById('scan-status').innerText = '';
+            const fileInput = document.getElementById('image-input');
+            if (fileInput) fileInput.value = '';
         }
 
         // --- Recipe Generation ---

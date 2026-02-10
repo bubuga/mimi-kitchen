@@ -306,6 +306,20 @@
             </div>
 
             <div id="content-inventory" class="space-y-6">
+                <!-- 批量操作工具栏 -->
+                <div class="flex justify-between items-center bg-stone-50 p-2 rounded border border-stone-200"
+                    id="inventory-toolbar">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="select-all-inv" onchange="toggleSelectAll(this.checked)"
+                            class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                        <label for="select-all-inv"
+                            class="text-xs font-bold text-stone-500 cursor-pointer select-none">全选 / Select All</label>
+                    </div>
+                    <button onclick="deleteSelectedItems()" id="delete-selected-btn"
+                        class="hidden pixel-button bg-rose-500 text-white px-3 py-1 text-xs font-bold transition-all hover:bg-rose-600">
+                        删除选中项 (<span id="selected-count">0</span>)
+                    </button>
+                </div>
                 <div id="inventory-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
 
@@ -1007,24 +1021,102 @@
 
         function renderInventory() {
             const grid = document.getElementById('inventory-grid');
+            if (inventory.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-20 text-stone-300 text-xs">冰箱空空的，快去进货吧！</div>`;
+                return;
+            }
             grid.innerHTML = inventory.filter(i => i.qty > 0).map(i => `
-                <div class="pixel-border p-4 bg-white">
-                    <div class="flex justify-between mb-3">
-                        <h4 class="font-bold text-sm">${i.name}</h4>
-                        <span class="text-[8px] bg-stone-800 text-white px-2 py-1">${(i.loc || 'cold').toUpperCase()}</span>
+                <div class="pixel-border p-4 bg-white relative group transition-all hover:shadow-lg">
+                    <div class="absolute top-3 right-3 z-10">
+                         <input type="checkbox" class="inventory-checkbox w-5 h-5 accent-emerald-500 cursor-pointer" value="${i.id}" onchange="updateDeleteButtonState()">
+                    </div>
+                    <div class="flex justify-between mb-3 pr-8">
+                        <h4 class="font-bold text-sm truncate" title="${i.name}">${i.name}</h4>
+                        <span class="text-[8px] bg-stone-800 text-white px-2 py-1 rounded-sm flex-shrink-0 ml-2 h-fit">${(i.loc || 'cold').toUpperCase()}</span>
                     </div>
                     <div class="space-y-3">
                         <div class="flex justify-between text-[9px] font-bold">
                             <span>STOCK / ${i.qty}%</span>
                             <span class="${getDays(i.exp) <= 3 ? 'text-rose-500' : ''}">EXP / ${getDays(i.exp)}D</span>
                         </div>
-                        <input type="range" value="${i.qty}" min="0" max="100" step="10" class="w-full" oninput="updateQty(${i.id}, this.value)">
+                        <input type="range" value="${i.qty}" min="0" max="100" step="10" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-stone-800" oninput="updateQty(${i.id}, this.value)">
                     </div>
-                    <div class="mt-4 pt-2 border-t border-stone-50 flex justify-between">
+                    <div class="mt-4 pt-2 border-t border-stone-50 flex justify-between items-center">
                         <span class="text-[8px] text-stone-300">EXP: ${i.exp}</span>
-                        <button onclick="removeItem(${i.id})" class="text-stone-200 hover:text-rose-500"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                        <button onclick="removeItem(${i.id})" class="text-stone-200 hover:text-rose-500 p-1 rounded hover:bg-rose-50 transition-colors"><i class="fas fa-trash-alt text-[10px]"></i></button>
                     </div>
                 </div>`).join('');
+
+            // 重置全选状态
+            const selectAllCb = document.getElementById('select-all-inv');
+            if (selectAllCb) selectAllCb.checked = false;
+            updateDeleteButtonState();
+        }
+
+        // --- Batch Operations ---
+        function toggleSelectAll(checked) {
+            document.querySelectorAll('.inventory-checkbox').forEach(cb => {
+                cb.checked = checked;
+            });
+            updateDeleteButtonState();
+        }
+
+        function updateDeleteButtonState() {
+            const selected = document.querySelectorAll('.inventory-checkbox:checked');
+            const btn = document.getElementById('delete-selected-btn');
+            const countSpan = document.getElementById('selected-count');
+
+            if (selected.length > 0) {
+                btn.classList.remove('hidden');
+                btn.classList.add('inline-block');
+                countSpan.innerText = selected.length;
+            } else {
+                btn.classList.add('hidden');
+                btn.classList.remove('inline-block');
+            }
+
+            // 更新全选框状态
+            const all = document.querySelectorAll('.inventory-checkbox');
+            const selectAllCb = document.getElementById('select-all-inv');
+            if (selectAllCb && all.length > 0) {
+                selectAllCb.checked = selected.length === all.length;
+                selectAllCb.indeterminate = selected.length > 0 && selected.length < all.length;
+            }
+        }
+
+        async function deleteSelectedItems() {
+            const selected = Array.from(document.querySelectorAll('.inventory-checkbox:checked')).map(cb => cb.value);
+            if (selected.length === 0) return;
+
+            if (!confirm(`确定要删除选中的 ${selected.length} 个食材吗？`)) return;
+
+            const btn = document.getElementById('delete-selected-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "删除中...";
+            btn.disabled = true;
+
+            try {
+                // 逐个删除（Supabase free tier 建议简单的操作）或者用 in 过滤删除
+                // 这里为了简单稳妥，循环调用 deleteItemFromCloud
+                // 如果量大可以优化为 delete().in('id', selected)
+
+                // 优化：批量删除
+                if (householdId) {
+                    await sb.from('inventory').delete().eq('household_id', householdId).in('id', selected);
+                }
+
+                // 更新本地数据
+                inventory = inventory.filter(i => !selected.includes(String(i.id))); // 注意类型转换
+                renderAll();
+
+            } catch (e) {
+                console.error("批量删除失败", e);
+                alert("删除失败，请重试");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                updateDeleteButtonState(); // 会隐藏按钮
+            }
         }
 
         function renderUrgent() {

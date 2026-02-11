@@ -937,34 +937,48 @@
             btn.innerText = "CHEF IS COOKING...";
 
             try {
-                const urgentItems = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).map(i => i.name).join(',');
-                const allItems = inventory.filter(i => i.qty > 0).map(i => i.name).join(',');
+                const urgentItems = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).map(i => i.name);
+                const allItems = inventory.filter(i => i.qty > 0).map(i => i.name);
 
-                if (!allItems) {
+                if (allItems.length === 0) {
                     alert('冰箱里没有食材，请先添加一些食材再生成菜谱！');
                     return;
                 }
 
+                // 动态计算推荐菜谱数量：食材数 × 0.45，最少2道，最多6道
+                const recipeCount = Math.max(2, Math.min(6, Math.round(allItems.length * 0.45)));
+                const urgentCount = Math.max(0, Math.min(3, Math.round(urgentItems.length * 0.5)));
+                const generalCount = recipeCount - urgentCount;
+
                 const cookbookCtx = userRecipes.length > 0 ? userRecipes.map(r => `[菜名: ${r.title}, 食材: ${r.ingredients}]`).join('\n') : "无";
 
                 const prompt = `你现在是顶级大厨米米。
-冰箱现有食材：${allItems}
-临期需消耗食材：${urgentItems || '无'}
+
+冰箱现有食材：${allItems.join('、')}
+临期需优先消耗：${urgentItems.length > 0 ? urgentItems.join('、') : '无'}
 私家菜谱库：${cookbookCtx}
 
-任务要求：
-1. 优先从私家库匹配。
-2. 对于非私家菜谱，请生成极其详细的烹饪步骤。
-3. 提供该菜谱的具体搜索链接跳转到下厨房：https://www.xiachufang.com/search/?keyword=[菜名]
-4. 严格返回以下 JSON 格式（不要包含任何其他文字）：
-{ "urgent": [{"title": "菜名", "desc": "简介", "steps": ["步骤1", "步骤2"], "fromCookbook": false, "detailLink": "链接"}], "general": [{"title": "菜名", "desc": "简介", "steps": ["步骤1", "步骤2"], "fromCookbook": false, "detailLink": "链接"}] }`;
+【重要规则】
+1. 只推荐真实存在的、在下厨房（xiachufang.com）上能搜到的中国家常菜。
+2. 绝对不要发明菜名！不要把食材随意组合成不存在的菜。
+3. 每道菜只使用冰箱里的 2-3 种主要食材，不要把所有食材塞进一道菜。
+4. 优先安排临期食材的菜谱。
+5. 优先从私家菜谱库匹配。
+6. 对于非私家菜谱，提供简洁的烹饪步骤（3-5步）。
+
+【数量要求】
+- 临期抢救菜谱：${urgentCount} 道（如果有临期食材的话）
+- 大厨推荐菜谱：${generalCount} 道
+
+【返回格式】严格返回 JSON，不要包含任何其他文字：
+{
+  "urgent": [{"title": "真实菜名", "desc": "一句话简介", "ingredients": "用到的食材", "steps": ["步骤1", "步骤2", "步骤3"], "fromCookbook": false}],
+  "general": [{"title": "真实菜名", "desc": "一句话简介", "ingredients": "用到的食材", "steps": ["步骤1", "步骤2", "步骤3"], "fromCookbook": false}]
+}`;
 
                 const result = await geminiCall(prompt);
 
-                if (!result) {
-                    // geminiCall already showed alert if needed
-                    return;
-                }
+                if (!result) return;
 
                 const data = extractJson(result);
                 renderRecipeResults(data);
@@ -983,33 +997,30 @@
             const generalDiv = document.getElementById('general-recipes');
 
             const renderCard = (r, isUrgent) => {
-                // 确保跳转链接始终有效，优先级：AI生成的detailLink > 下厨房搜索
-                const searchLink = r.detailLink || `https://www.xiachufang.com/search/?keyword=${encodeURIComponent(r.title)}`;
-                const cookLink = `https://cook.zhangjc.tech/?ingredients=${encodeURIComponent(r.title)}`;
+                // 始终用下厨房搜索链接（因为推荐的都是真实菜名）
+                const searchLink = `https://www.xiachufang.com/search/?keyword=${encodeURIComponent(r.title)}`;
 
                 return `
                 <div class="pixel-border p-6 ${isUrgent ? 'bg-rose-50' : 'bg-white'} flex flex-col h-full">
-                    <div class="flex justify-between items-start mb-3">
+                    <div class="flex justify-between items-start mb-2">
                         <h5 class="font-bold text-lg">/ ${r.title}</h5>
                         ${r.fromCookbook ? '<span class="text-[8px] bg-peach px-2 py-0.5 font-bold">私家秘籍</span>' : '<span class="text-[8px] bg-stone-100 px-2 py-0.5 font-bold">米米大厨</span>'}
                     </div>
+                    ${r.ingredients ? `<p class="text-[9px] text-stone-400 mb-1">🧺 食材：${r.ingredients}</p>` : ''}
                     <p class="text-[11px] text-stone-400 mb-4 line-clamp-2">${r.desc || '美味烹饪推荐。'}</p>
                     <div class="space-y-2 border-l-2 border-stone-800 pl-3 flex-grow mb-6">
                         ${(r.steps || []).map((s, idx) => `<div class="text-[10px] leading-relaxed"><span class="font-bold">#${idx + 1}</span> ${s}</div>`).join('')}
                     </div>
                     
                     ${!r.fromCookbook ? `
-                    <div class="flex flex-col gap-3 border-t border-stone-100 pt-4">
+                    <div class="border-t border-stone-100 pt-4">
                         <a href="${searchLink}" target="_blank" class="flex items-center text-[10px] text-blue-600 font-bold underline uppercase tracking-widest hover:text-blue-800">
-                            <i class="fas fa-external-link-alt mr-2"></i> 查看具体菜谱步骤 →
-                        </a>
-                        <a href="${cookLink}" target="_blank" class="text-[8px] text-stone-400 underline hover:text-stone-600">
-                            在 Cook 平台查看食材组合
+                            <i class="fas fa-external-link-alt mr-2"></i> 在下厨房查看详细做法 →
                         </a>
                     </div>
                     ` : '<div class="text-[9px] text-stone-400 italic">来自您的私家秘籍库。</div>'}
-                </div>
-            `};
+                </div>`;
+            };
 
             urgentDiv.innerHTML = '<div class="col-span-full border-b-2 border-rose-100 pb-2 mb-2"><h4 class="text-rose-500 font-bold text-sm">✦ 临期抢救</h4></div>' + (data.urgent || []).map(r => renderCard(r, true)).join('');
             generalDiv.innerHTML = '<div class="col-span-full border-b-2 border-stone-200 pb-2 mb-2"><h4 class="text-stone-400 font-bold text-sm">✦ 大厨推荐</h4></div>' + (data.general || []).map(r => renderCard(r, false)).join('');
@@ -1022,11 +1033,11 @@
         function renderInventory() {
             const grid = document.getElementById('inventory-grid');
             if (inventory.length === 0) {
-                grid.innerHTML = `<div class="col-span-full text-center py-20 text-stone-300 text-xs">冰箱空空的，快去进货吧！</div>`;
+                grid.innerHTML = `< div class="col-span-full text-center py-20 text-stone-300 text-xs" > 冰箱空空的，快去进货吧！</div > `;
                 return;
             }
             grid.innerHTML = inventory.filter(i => i.qty > 0).map(i => `
-                <div class="pixel-border p-4 bg-white relative group transition-all hover:shadow-lg">
+                < div class="pixel-border p-4 bg-white relative group transition-all hover:shadow-lg" >
                     <div class="absolute top-3 right-3 z-10">
                          <input type="checkbox" class="inventory-checkbox w-5 h-5 accent-emerald-500 cursor-pointer" value="${i.id}" onchange="updateDeleteButtonState()">
                     </div>
@@ -1045,7 +1056,7 @@
                         <span class="text-[8px] text-stone-300">EXP: ${i.exp}</span>
                         <button onclick="removeItem(${i.id})" class="text-stone-200 hover:text-rose-500 p-1 rounded hover:bg-rose-50 transition-colors"><i class="fas fa-trash-alt text-[10px]"></i></button>
                     </div>
-                </div>`).join('');
+                </div > `).join('');
 
             // 重置全选状态
             const selectAllCb = document.getElementById('select-all-inv');
@@ -1122,9 +1133,9 @@
         function renderUrgent() {
             const itemsUrgent = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).sort((a, b) => getDays(a.exp) - getDays(b.exp));
             const container = document.getElementById('urgent-container');
-            if (itemsUrgent.length === 0) { container.innerHTML = `<div class="text-center py-10 text-stone-300 text-[10px]">冰箱目前很新鲜安全。</div>`; return; }
+            if (itemsUrgent.length === 0) { container.innerHTML = `< div class="text-center py-10 text-stone-300 text-[10px]" > 冰箱目前很新鲜安全。</div > `; return; }
             container.innerHTML = itemsUrgent.map(i => `
-                <div class="border-b border-stone-100 py-2 flex justify-between items-center bg-white px-2">
+                < div class="border-b border-stone-100 py-2 flex justify-between items-center bg-white px-2" >
                     <div class="flex items-center gap-3">
                         <span class="text-sm">${i.cat === 'veg' ? '🥦' : (i.cat === 'meat' ? '🥩' : '🍎')}</span>
                         <div class="text-[10px] font-bold">${i.name}</div>
@@ -1132,7 +1143,7 @@
                     <div class="text-[9px] font-bold ${getDays(i.exp) < 0 ? 'text-rose-500' : 'text-amber-500'}">
                         ${getDays(i.exp) < 0 ? '已过期' : '剩 ' + getDays(i.exp) + ' 天'}
                     </div>
-                </div>`).join('');
+                </div > `).join('');
         }
 
         function renderStats() {
@@ -1140,7 +1151,7 @@
             const soon = inventory.filter(i => getDays(i.exp) <= 3 && getDays(i.exp) >= 0 && i.qty > 0).length;
             const exp = inventory.filter(i => getDays(i.exp) < 0 && i.qty > 0).length;
             document.getElementById('stats-display').innerHTML = `
-                <div class="text-[10px]"><span class="block text-emerald-500 font-bold text-sm">${fresh}</span>FRESH</div>
+                < div class="text-[10px]" > <span class="block text-emerald-500 font-bold text-sm">${fresh}</span>FRESH</div >
                 <div class="text-[10px]"><span class="block text-amber-500 font-bold text-sm">${soon}</span>WARN</div>
                 <div class="text-[10px]"><span class="block text-rose-500 font-bold text-sm">${exp}</span>EXP</div>`;
             const ctx = document.getElementById('healthChart').getContext('2d');
@@ -1154,16 +1165,16 @@
 
         function renderCookbook() {
             const grid = document.getElementById('cookbook-grid');
-            if (userRecipes.length === 0) { grid.innerHTML = `<div class="col-span-full text-center py-20 text-stone-300 text-xs">书架还是空的，快记录你的拿手好菜。</div>`; return; }
+            if (userRecipes.length === 0) { grid.innerHTML = `< div class="col-span-full text-center py-20 text-stone-300 text-xs" > 书架还是空的，快记录你的拿手好菜。</div > `; return; }
             grid.innerHTML = userRecipes.map(r => `
-                <div class="pixel-border p-6 bg-white">
+                < div class="pixel-border p-6 bg-white" >
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="font-bold">✦ ${r.title}</h4>
                         <button onclick="removeRecipe(${r.id})" class="text-stone-200 hover:text-rose-500"><i class="fas fa-trash-alt"></i></button>
                     </div>
                     <p class="text-[10px] text-stone-500 mb-2">${r.ingredients}</p>
                     <p class="text-[11px] leading-relaxed line-clamp-2">${r.steps}</p>
-                </div>`).join('');
+                </div > `).join('');
         }
 
         function updateMimi() {

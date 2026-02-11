@@ -1033,11 +1033,11 @@
         function renderInventory() {
             const grid = document.getElementById('inventory-grid');
             if (inventory.length === 0) {
-                grid.innerHTML = `< div class="col-span-full text-center py-20 text-stone-300 text-xs" > 冰箱空空的，快去进货吧！</div > `;
+                grid.innerHTML = `<div class="col-span-full text-center py-20 text-stone-300 text-xs">冰箱空空的，快去进货吧！</div>`;
                 return;
             }
             grid.innerHTML = inventory.filter(i => i.qty > 0).map(i => `
-                < div class="pixel-border p-4 bg-white relative group transition-all hover:shadow-lg" >
+                <div class="pixel-border p-4 bg-white relative group transition-all hover:shadow-lg">
                     <div class="absolute top-3 right-3 z-10">
                          <input type="checkbox" class="inventory-checkbox w-5 h-5 accent-emerald-500 cursor-pointer" value="${i.id}" onchange="updateDeleteButtonState()">
                     </div>
@@ -1056,7 +1056,7 @@
                         <span class="text-[8px] text-stone-300">EXP: ${i.exp}</span>
                         <button onclick="removeItem(${i.id})" class="text-stone-200 hover:text-rose-500 p-1 rounded hover:bg-rose-50 transition-colors"><i class="fas fa-trash-alt text-[10px]"></i></button>
                     </div>
-                </div > `).join('');
+                </div>`).join('');
 
             // 重置全选状态
             const selectAllCb = document.getElementById('select-all-inv');
@@ -1133,9 +1133,9 @@
         function renderUrgent() {
             const itemsUrgent = inventory.filter(i => getDays(i.exp) <= 3 && i.qty > 0).sort((a, b) => getDays(a.exp) - getDays(b.exp));
             const container = document.getElementById('urgent-container');
-            if (itemsUrgent.length === 0) { container.innerHTML = `< div class="text-center py-10 text-stone-300 text-[10px]" > 冰箱目前很新鲜安全。</div > `; return; }
+            if (itemsUrgent.length === 0) { container.innerHTML = `<div class="text-center py-10 text-stone-300 text-[10px]">冰箱目前很新鲜安全。</div>`; return; }
             container.innerHTML = itemsUrgent.map(i => `
-                < div class="border-b border-stone-100 py-2 flex justify-between items-center bg-white px-2" >
+                <div class="border-b border-stone-100 py-2 flex justify-between items-center bg-white px-2">
                     <div class="flex items-center gap-3">
                         <span class="text-sm">${i.cat === 'veg' ? '🥦' : (i.cat === 'meat' ? '🥩' : '🍎')}</span>
                         <div class="text-[10px] font-bold">${i.name}</div>
@@ -1143,7 +1143,7 @@
                     <div class="text-[9px] font-bold ${getDays(i.exp) < 0 ? 'text-rose-500' : 'text-amber-500'}">
                         ${getDays(i.exp) < 0 ? '已过期' : '剩 ' + getDays(i.exp) + ' 天'}
                     </div>
-                </div > `).join('');
+                </div>`).join('');
         }
 
         function renderStats() {
@@ -1151,7 +1151,7 @@
             const soon = inventory.filter(i => getDays(i.exp) <= 3 && getDays(i.exp) >= 0 && i.qty > 0).length;
             const exp = inventory.filter(i => getDays(i.exp) < 0 && i.qty > 0).length;
             document.getElementById('stats-display').innerHTML = `
-                < div class="text-[10px]" > <span class="block text-emerald-500 font-bold text-sm">${fresh}</span>FRESH</div >
+                <div class="text-[10px]"><span class="block text-emerald-500 font-bold text-sm">${fresh}</span>FRESH</div>
                 <div class="text-[10px]"><span class="block text-amber-500 font-bold text-sm">${soon}</span>WARN</div>
                 <div class="text-[10px]"><span class="block text-rose-500 font-bold text-sm">${exp}</span>EXP</div>`;
             const ctx = document.getElementById('healthChart').getContext('2d');
@@ -1165,16 +1165,16 @@
 
         function renderCookbook() {
             const grid = document.getElementById('cookbook-grid');
-            if (userRecipes.length === 0) { grid.innerHTML = `< div class="col-span-full text-center py-20 text-stone-300 text-xs" > 书架还是空的，快记录你的拿手好菜。</div > `; return; }
+            if (userRecipes.length === 0) { grid.innerHTML = `<div class="col-span-full text-center py-20 text-stone-300 text-xs">书架还是空的，快记录你的拿手好菜。</div>`; return; }
             grid.innerHTML = userRecipes.map(r => `
-                < div class="pixel-border p-6 bg-white" >
+                <div class="pixel-border p-6 bg-white">
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="font-bold">✦ ${r.title}</h4>
                         <button onclick="removeRecipe(${r.id})" class="text-stone-200 hover:text-rose-500"><i class="fas fa-trash-alt"></i></button>
                     </div>
                     <p class="text-[10px] text-stone-500 mb-2">${r.ingredients}</p>
                     <p class="text-[11px] leading-relaxed line-clamp-2">${r.steps}</p>
-                </div > `).join('');
+                </div>`).join('');
         }
 
         function updateMimi() {
